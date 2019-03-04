@@ -1,9 +1,27 @@
 #coding=utf-8
+import threading
 import requests
-import itchat
 import json
+from flask import Flask, make_response
+import itchat
 
+qrSource = ''
 KEY = 'f07131b709ad4568bb81c177dafc0f97'
+
+def start_flask():
+    flaskApp = Flask('itchat')
+    @flaskApp.route('/')
+    def return_qr():
+        if len(qrSource) < 100:
+            return qrSource
+        else:
+            response = make_response(qrSource)
+            response.headers['Content-Type'] = 'image/jpeg'
+            return response
+    flaskApp.run(host='0.0.0.0')
+flaskThread = threading.Thread(target=start_flask)
+flaskThread.setDaemon(True)
+flaskThread.start()
 
 def get_response(msg):
     # 这里我们就像在“3. 实现最简单的与图灵机器人的交互”中做的一样
@@ -26,7 +44,15 @@ def get_response(msg):
         # 将会返回一个None
         return
 
-# 这里是我们在“1. 实现微信消息的获取”中已经用到过的同样的注册方法
+def qrCallback(uuid, status, qrcode):
+    if status == '0':
+        global qrSource
+        qrSource = qrcode
+    elif status == '200':
+        qrSource = 'Logged in!'
+    elif status == '201':
+        qrSource = 'Confirm'
+
 @itchat.msg_register(itchat.content.TEXT)
 def tuling_reply(msg):
     # 为了保证在图灵Key出现问题的时候仍旧可以回复，这里设置一个默认回复
@@ -37,13 +63,10 @@ def tuling_reply(msg):
     # a or b的意思是，如果a有内容，那么返回a，否则返回b
     # 有内容一般就是指非空或者非None，你可以用`if a: print('True')`来测试
     # 指定用户不回复消息
-    if msg['FromUserName'] == '@56e7194aace9efd303c120e55dc2b276':
-        return False
-    elif msg['FromUserName'] == '@7359012517be32edf8936a68e04a5191b96c581289de22d8489c37fb5963b542':
+    if msg['FromUserName'] ==   '@7359012517be32edf8936a68e04a5191b96c581289de22d8489c37fb5963b542':
         return False
     else :
         return defaultReply
 
-# 为了让实验过程更加方便（修改程序不用多次扫码），我们使用热启动
-itchat.auto_login(hotReload=True)
+itchat.auto_login(True, qrCallback=qrCallback)
 itchat.run()
